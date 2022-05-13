@@ -1,4 +1,4 @@
-=import com.hsbc.group.tooling.jenkins.build.Maven
+import com.hsbc.group.tooling.jenkins.build.Maven
 import com.hsbc.group.tooling.jenkins.build.Docker
 
 @groovy.transform.Field def workspaceDir
@@ -20,7 +20,7 @@ def call(Map config) {
                 
                 this.executeMvnBuild()
             }
-            this.deployFromNexus2ToGKE
+            this.deployFromNexus2ToGKE()
         } catch (Throwable t) {
             logger.error(" Error in executing build step, exception is :" + t.getMessage());
         }
@@ -70,14 +70,10 @@ private def executeMvnBuild() {
 
 private def deployFromNexus2ToGKE() {
 	def artifactURL = config.artifactURL
-    dir(unzipDir) {
-
-	        sh """
-	            cp ../cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
-	        """
-	    	this.buildDockerImage()
-	    	this.uploadDockerImageToNexus3()
-	}
+    	sh """
+            cp ../cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
+   	 """
+    	this.buildDockerImage()
 }
 
 private def buildDockerImage() {
