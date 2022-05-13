@@ -1,4 +1,4 @@
-import com.hsbc.group.tooling.jenkins.build.Maven
+=import com.hsbc.group.tooling.jenkins.build.Maven
 import com.hsbc.group.tooling.jenkins.build.Docker
 
 @groovy.transform.Field def workspaceDir
@@ -20,6 +20,7 @@ def call(Map config) {
                 
                 this.executeMvnBuild()
             }
+            this.deployFromNexus2ToGKE
         } catch (Throwable t) {
             logger.error(" Error in executing build step, exception is :" + t.getMessage());
         }
@@ -62,11 +63,9 @@ private def executeMvnBuild() {
                     """
                 }
             }
-
+        } catch (Exception e) {
+            throw new Exception("ERROR- in building package ", e)
         }
-    catch (Exception e) {
-        throw new Exception("ERROR- in building package ", e)
-    }
 }
 
 private def deployFromNexus2ToGKE() {
@@ -76,7 +75,6 @@ private def deployFromNexus2ToGKE() {
 	        sh """
 	            cp ../cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
 	        """
-    		}
 	    	this.buildDockerImage()
 	    	this.uploadDockerImageToNexus3()
 	}
@@ -94,9 +92,9 @@ private def buildDockerImage() {
             withCredentials([usernamePassword(credentialsId: 'ALM_NEXUS3_CREDS', passwordVariable: 'PASSWORD', usernameVariable: 'USER')]) {
             //docker.buildImage(dockerFilePath)
                 sh """
-			docker login ${nexus3DockerRestrictedRepoBase} --username ${env.USER} --password ${env.PASSWORD}
-			#docker rmi \$(docker images -a -q)
-		"""
+			      docker login ${nexus3DockerRestrictedRepoBase} --username ${env.USER} --password ${env.PASSWORD}
+			      #docker rmi \$(docker images -a -q)
+		        """
                 buildOutput = sh (
                     script: "docker build --tag ${tagName} ${dockerFilePath}",
                     returnStdout: true
@@ -110,8 +108,9 @@ private def buildDockerImage() {
                             imageId = strMap[2].trim()
                         }
                 }
-                println("Image ID: ${imageId}")
+            println("Image ID: ${imageId}")
             logger.trace("Docker Image Build Stage Complete")
+            }
         }
     }
 }
