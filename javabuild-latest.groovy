@@ -70,10 +70,10 @@ private def executeMvnBuild() {
 
 private def deployFromNexus2ToGKE() {
 	def artifactURL = config.artifactURL
-    	sh """
-            cp ../cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
-   	 """
-    	this.buildDockerImage()
+    sh """
+        cp ../cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
+    """
+    this.buildDockerImage()
 }
 
 private def buildDockerImage() {
@@ -84,7 +84,7 @@ private def buildDockerImage() {
 
         stage('Deploy to nexus') {
             logger.trace("Docker Image Build Stage Start")
-            logger.info("intial dockerFilePath: ${dockerFilePath}")
+            logger.info("intial dockerFilePath: ${this.config.dockerFilePath}")
             withCredentials([usernamePassword(credentialsId: 'ALM_NEXUS3_CREDS', passwordVariable: 'PASSWORD', usernameVariable: 'USER')]) {
             //docker.buildImage(dockerFilePath)
                 sh """
@@ -92,7 +92,7 @@ private def buildDockerImage() {
 			      #docker rmi \$(docker images -a -q)
 		        """
                 buildOutput = sh (
-                    script: "docker build --tag ${tagName} ${dockerFilePath}",
+                    script: "docker build --tag ${tagName} ${this.config.dockerFilePath}",
                     returnStdout: true
                 ).trim()
                 println (buildOutput)
