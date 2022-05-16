@@ -1,0 +1,37 @@
+private def deployFromNexus2ToGKE() {
+    stage('Merge Repository code') {
+        dir("/tmp") {
+            if (isUnix()) {
+                this.gitClient = "GIT_Latest_Linux"
+                this.gitCmd = tool this.gitClient
+                this.debug = ('DEBUG' == env.LOGGING_LEVEL || 'TRACE' == env.LOGGING_LEVEL) ? 'set -x' : 'set +x'
+            } else {
+                this.gitClient = "GIT_Latest_Windows"
+            this.gitCmd = tool this.gitClient
+            this.debug = ('DEBUG' == env.LOGGING_LEVEL || 'TRACE' == env.LOGGING_LEVEL) ? 'Set-PSDebug -Trace 1' : 'Set-PSDebug -Off'
+            }
+            try {
+                    def gitHubBaseURL = (env.GITHUB_BASE_URL) ? env.GITHUB_BASE_URL : 'https://alm-github.systems.uk.hsbc'
+
+                    def gitURL: "${gitHubBaseURL}/${this.config.gitDeployRepo}.git",
+                    checkout([$class                           : 'GitSCM',
+                              branches                         : [[name: this.config.gitDeployBranch]],
+                              doGenerateSubmoduleConfigurations: false,
+                              extensions                       : [],
+                              gitTool                          : this.gitClient,
+                              submoduleCfg                     : [],
+                              userRemoteConfigs                : [[credentialsId: 'ALM_GITHUB_CREDS',
+                                                                   url          : this.gitURL]]])
+                } catch (Exception e) {
+                    logger.error("Checkout failed.")
+                }
+        }
+        dir(workspaceDir) {
+            sh """
+                ls -la /tmp/
+                cp /tmp/cmb-digital-onboarding-honeycomb-build-settings/cmb-digital-onboarding-ddapi/GKE/DEV/* .
+            """
+        }
+    }
+    this.buildDockerImage()
+}
