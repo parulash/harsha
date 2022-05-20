@@ -1,0 +1,29 @@
+private def scanSAST(){
+    stage('Merge Repository code') {
+        withCredentials([usernamePassword(credentialsId: '882ed20b-8f24-478f-b80b-8b22bc207f17', passwordVariable: 'PASSWORD', usernameVariable: 'USER')]) {
+            withCredentials([string(credentialsId: 'CYBERFLOW_CONFIG_ID_PRECONF', variable: 'CYBERFLOW_CONFIG_ID_PRECONF')]) {
+                    sh """
+                        # USE JENKINS CREDENTIALS MANAGER TO STORE YOUR ${SERVICE_ACCOUNT_USERNAME}, ${SERVICE_ACCOUNT_PASSWORD} and ${CYBERFLOW_CONFIG_ID...} AND OTHER ${XXXXX} SECRETS PRESENT IN THIS SHELL SCRIPT
+                        # PLEASE ENSURE YOU USE A SERVICE ACCOUNT TO ACCESS YOUR ABSTRACTION LAYER PROJECTS
+                        set +x # DO NOT REMOVE THIS LINE OR YOUR BEARER TOKEN WILL BE DISCLOSED IN JENKINS LOGS
+                        BEARER_TOKEN=$(curl -X POST 'https://cyberflows.systems.uk.hsbc/api/v1/auth/login' \
+                -H 'Accept: application/json, text/plain, */*' \
+                -d "username=${SERVICE_ACCOUNT_USERNAME}&password=${SERVICE_ACCOUNT_PASSWORD}" | sed -e 's/[{}]/\n/g' | tr "," "\n" | grep -m 1 '"access_token":' | sed -e 's/"//g' | cut -d: -f 2-)
+                
+                        [ -z "$BEARER_TOKEN" ] && echo "Failure: Unable to Authenticate user ${SERVICE_ACCOUNT_USERNAME}" && exit 1
+                        # script in green to be used when git url is specified in the configuration.
+                        echo 'Launching Scan Using Pre-Configured Cyberflows ALM-GITHUB Project...'
+                        curl -X POST "https://cyberflows.systems.uk.hsbc/api/v1/configuration/${CYBERFLOW_CONFIG_ID_PRECONF}/launch_scan/" \
+                -H "accept: application/json" \
+                -H "Authorization: Bearer $BEARER_TOKEN" | tee response.txt | grep -c '"error":null' || (cat response.txt && exit 1)
+                        echo 'Launch of scan on pre-configured ALM-GITHUB successful!'
+                        cat response.txt && echo "" && echo 'Your source code analysis (from ALM Github repository) report will be available here: https://cyberflows.systems.uk.hsbc/scans.html?scan='$(cat response.txt | sed -e 's/[{}]/\n/g' | tr "," "\n" | grep -m 1 '"id":' | sed -e 's/"//g' | cut -d: -f 2-)   
+                        # script in blue to used when git url isn't specified in the configuration.
+                        echo 'Uploading Source Code Archive...'
+                        cat response.txt && echo "" && \
+                        echo 'Your source code analysis (from uploaded source code archive) report will be available here: https://cyberflows.systems.uk.hsbc/scans.html?scan='$(cat response.txt | sed -e 's/[{}]/\n/g' | tr "," "\n" | grep -m 1 '"id":' | sed -e 's/"//g' | cut -d: -f 2-)
+                    """
+            }
+        }
+    }
+}
