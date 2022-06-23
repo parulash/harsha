@@ -1,0 +1,41 @@
+private def scanCONT(){
+    stage('CONTAINER SCAN') {
+        try {
+            withCredentials([usernamePassword(credentialsId: '634af178-e798-460f-9d18-a138a1d744a1', passwordVariable: 'SERVICE_ACCOUNT_PASSWORD', usernameVariable: 'SERVICE_ACCOUNT_USERNAME')]) {
+                withCredentials([string(credentialsId:this.config.containerCyberflowId, variable: 'CONTAINER_SCAN_DDAPI')]) {
+                    def BEARER_TOKEN= sh(script: """curl -X POST 'https://cyberflows.systems.uk.hsbc/api/v1/auth/login' -H 'Accept: application/json, text/plain, */*' -d "username=${SERVICE_ACCOUNT_USERNAME}&password=${SERVICE_ACCOUNT_PASSWORD}" | grep -m 1 \'"access_token":\' | sed -e \'s/"//g\' | cut -d: -f 2- | cut -f1 -d"," """, returnStdout: true).trim()
+                    sh """
+                        [ -z "$BEARER_TOKEN" ] && echo "Failure: Unable to Authenticate user ${SERVICE_ACCOUNT_USERNAME}" && exit 1
+                        echo 'Launching Container Scan Using Pre-Configured Cyberflows Container Scan Configuration...'
+                        curl -X POST "https://cyberflows.systems.uk.hsbc/api/v1/configuration/${CONTAINER_SCAN_DDAPI}/launch_scan/" \
+                            -H "accept: application/json" \
+                            -H "Authorization: Bearer $BEARER_TOKEN" | tee response.txt | grep -c '"error":null' || (cat response.txt && exit 1)
+                        echo 'Launch of scan using Cyberflows Container Configuration successful!'
+                        cat response.txt && echo "" && \
+                        echo 'Your scan report will be available here: https://cyberflows.systems.uk.hsbc/scans.html?scan='\$(cat response.txt | sed -e 's/[{}]/\n/g' | tr "," "\n" | grep -m 1 '"id":' | sed -e 's/"//g' | cut -d: -f 2-)
+                        
+                        sudo chmod +x /build_tools/1.5/jq
+                        ls -la /build_tools
+                        """
+                    def SCAN_ID=sh(script: """/build_tools/1.5/jq .id response.txt""",returnStdout: true).trim()
+                        sh """
+                            while [ \$(curl -X GET "https://cyberflows.systems.uk.hsbc/api/v1/service/scan/$SCAN_ID/" -H "accept: application/json" -H "Authorization: Bearer $BEARER_TOKEN" | /build_tools/1.5/jq .status) != '"Completed"' ];
+                            do
+                                echo "Scan is running......"
+                                sleep 1m
+                            done
+                        """
+                    def RESPONSE=sh(script: """curl -X GET "https://cyberflows.systems.uk.hsbc/api/v1/service/scan/$SCAN_ID/" -H "accept: application/json" -H "Authorization: Bearer $BEARER_TOKEN" |  /build_tools/1.5/jq '.findings | .[] | .severity'""",returnStdout: true).trim()
+                    RESPONSE.eachLine {
+                            if (it =~ /Critical/) {
+                                currentBuild.result='UNSTABLE'
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e){
+            currentBuild.result='UNSTABLE'
+        }
+    }
+}   
