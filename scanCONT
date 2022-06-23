@@ -18,7 +18,7 @@ private def scanCONT(){
                         ls -la /build_tools
                         """
                     def SCAN_ID=sh(script: """/build_tools/1.5/jq .id response.txt""",returnStdout: true).trim()
-                        sh """
+                    sh """
                             while [ \$(curl -X GET "https://cyberflows.systems.uk.hsbc/api/v1/service/scan/$SCAN_ID/" -H "accept: application/json" -H "Authorization: Bearer $BEARER_TOKEN" | /build_tools/1.5/jq .status) != '"Completed"' ];
                             do
                                 echo "Scan is running......"
