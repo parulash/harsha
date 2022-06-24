@@ -35,9 +35,9 @@ private def scanCONT(){
                         }
                     }
                 }
-            } catch (e){
+            } catch (err) {
                 currentBuild.result='UNSTABLE'
             }
         }
     }
-}   
+} 
