@@ -1,0 +1,68 @@
+def deployToNexus() {
+    stage("Deploy to Nexus"){
+        dir(dirName) {
+            artifactId = this.config.artifactId
+            groupId = this.config.groupId
+            version = this.config.artifactVersion
+            snapshot = false
+            traceabilityMetaDataFile = 'traceability-metadata.json'
+
+            if (version.toLowerCase().contains("snapshot")){
+                sh """
+                    export JAVA_HOME=/build_tools/jdk1.8.0_181
+                    node ${env.CI_NODE_MODULE_HOME}/node_modules/fci-tools/index.js traceability --groupId=${groupId} \
+                                        --artifactId=${artifactId} \
+                                        --version=${version} \
+                                        --repoTag=$env.BRANCH_TAG_NAME \
+                                        --jenkinsBuildNo=$env.BUILD_NUMBER ${traceabilityMetaDataFile} && \
+                    /build_tools/apache-maven-3.3.3/bin/mvn deploy:deploy-file -DgroupId=${groupId} \
+                                        -DartifactId=${artifactId} \
+                                        -Dversion=${version} \
+                                        -DrepositoryId=dsnexus-snapshots \
+                                        -Dclassifier="" \
+                                        -Durl=https://dsnexus.uk.hibm.hsbc:8081/nexus/content/repositories/snapshots \
+                                        -Dfile=${traceabilityMetaDataFile} \
+                                        -DgeneratePom=false && \
+                    pwd
+                    rm -rf .git*
+                    zip --symlinks -r ${artifactId}-${version}.zip . && \
+                    /build_tools/apache-maven-3.3.3/bin/mvn deploy:deploy-file -DgroupId=${groupId} \
+                                        -DartifactId=${artifactId} \
+                                        -Dversion=${version} \
+                                        -DgeneratePom=true \
+                                        -DrepositoryId=dsnexus-snapshots \
+                                        -Dpackaging=zip \
+                                        -Durl=https://dsnexus.uk.hibm.hsbc:8081/nexus/content/repositories/snapshots \
+                                        -Dfile=${artifactId}-${version}.zip
+                """
+            }else{
+                sh """
+                    export JAVA_HOME=/build_tools/jdk1.8.0_181
+                    rm -rf .git*
+                    zip --symlinks -r ${artifactId}-${version}.zip . && \
+                    /build_tools/apache-maven-3.3.3/bin/mvn deploy:deploy-file -DgroupId=${groupId} \
+                                        -DartifactId=${artifactId} \
+                                        -Dversion=${version} \
+                                        -DgeneratePom=true \
+                                        -DrepositoryId=dsnexus-releases \
+                                        -Dpackaging=zip \
+                                        -Durl=https://dsnexus.uk.hibm.hsbc:8081/nexus/content/repositories/releases \
+                                            -Dfile=${artifactId}-${version}.zip && \
+                    node ${env.CI_NODE_MODULE_HOME}/node_modules/fci-tools/index.js traceability --groupId=${groupId} \
+                                        --artifactId=${artifactId} \
+                                        --version=${version} \
+                                        --repoTag=$env.BRANCH_TAG_NAME \
+                                        --jenkinsBuildNo=$env.BUILD_NUMBER ${traceabilityMetaDataFile} && \
+                    /build_tools/apache-maven-3.3.3/bin/mvn deploy:deploy-file -DgroupId=${groupId} \
+                                        -DartifactId=${artifactId} \
+                                        -Dversion=${version} \
+                                        -DrepositoryId=dsnexus-releases \
+                                        -Dclassifier="" \
+                                        -Durl=https://dsnexus.uk.hibm.hsbc:8081/nexus/content/repositories/releases \
+                                        -Dfile=${traceabilityMetaDataFile} \
+                                        -DgeneratePom=false
+                """
+            }
+        }
+    }
+}
